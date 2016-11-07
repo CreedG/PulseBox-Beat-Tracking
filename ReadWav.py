@@ -1,7 +1,8 @@
 #I3Creed - Starting point for our algorithm
-
+import struct
 import wave, sys
 import numpy as np
+import mfcc
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -12,11 +13,25 @@ from time import sleep
 #THE ALGORITHM
 
 def beat_detect(wav):
-    #Normally would use wav.readframes to read in some data and use the data
-    #gathered so far to predict the next beat. Add that beat to the returned
-    #array which will be plot against the known beats
-    
-    #Sample beat results (placeholder for algorithm)
+    feats = np.empty((0,26))
+    d = []
+    num_samples = int(wav.getframerate() * .02 )
+    han = np.hanning(num_samples)
+    points = 1024
+    while (wav.getnframes() - wav.tell() > num_samples):
+        frames = np.fromstring(wav.readframes(num_samples),dtype='int16') * 1.
+        samples = np.multiply(frames, han)
+        fftd = np.absolute(np.fft.rfft(samples, points))
+        feat = mfcc.mfcc(fftd)
+        #feats = np.vstack([feats,feat])
+        wav.setpos(wav.tell() - int(num_samples / 2))
+        #dn = (feat[1] - feat[0])**2 + (feat[2] - feat[1])**2 + (feat[3] - feat[2])**2
+        d.append(feat[1])
+    plt.figure(3)
+    plt.plot(d)
+    plt.show()
+    exit(0)
+    #plt.plot(np.correlate(d,d, mode = 'full'))
     return [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
             26,27,28,29,30]
 
@@ -65,7 +80,7 @@ def main(argv):
     total_samples = wav.getnframes()
 
     display_div = 50
-    
+
     sample_data = sample_arr = downsample_arr = x_axis_seconds = [0,0,0]
     plt.figure(1)
     for i in range(0,3):
@@ -113,7 +128,7 @@ def main(argv):
 
     plt.show()
 
-    
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
