@@ -14,7 +14,8 @@ import time
 
 import math
 
-from beat_detect_utils import corr_peaks
+from beat_detect_utils import correlate_onsets
+from beat_detect_utils import find_consensus
 
 
 
@@ -89,12 +90,12 @@ def beat_detect(wav):
 
 
         #STEP 1: GENERATE ONSET VECTORS THAT WILL BE USED LATER TO FIND THE BEATS
-        #1A GENERATES A 10 POWER CHANGE ONSET VECTORS FOR DIFFERENT FREQUENCY BANDS
-        #1B GENERATES A CHORD CHANGE ONSET VECTOR (if we have time to do that)
-        #1C GENERATES A DRUM ONSET VECTOR IF DRUMS SEEM TO EXIST (if we have time t do that)
-        #AFTER STEP 1 WE WILL HAVE A BUNCH OF ONSET VECTORS TO WORK WITH
+        #1A GENERATES A 10 POWER CHANGE ONSET VECTORS FOR 10 DIFFERENT FREQUENCY BANDS
+        #1B GENERATES A CHORD CHANGE ONSET VECTOR
+        #1C GENERATES A DRUM ONSET VECTOR IF DRUMS SEEM TO EXIST
+        #AFTER STEP 1 WE WILL HAVE 12 ONSET VECTORS TO WORK WITH
 
-        #STEP 1A: SIGNAL TO 7 ONSET VECTORS FOR POWER CHANGES 
+        #STEP 1A: SIGNAL TO 10 ONSET VECTORS FOR POWER CHANGES (7 smaller bands, low band, medium band, all band)
 
         x_psd, y_psd = scipy.signal.periodogram(windowed, 22050) #the power spectrum
 
@@ -127,102 +128,27 @@ def beat_detect(wav):
         new_range_onsets = new_range_onsets.reshape((7,1))
         power_onset_vecs = np.hstack([power_onset_vecs,new_range_onsets])
 
+
+        corr = []
+        if (cur_time >= 20 and testBool == False):
+            top_periods = []
+            for i in range (0,7):
+                top_periods.append(correlate_onsets(power_onset_vecs[i],power_onset_vecs[i])[0][0])
+            print("top periods!",top_periods)
+            testBool = True
+
+            # Consider them all equally likely in the consensus process
+            overall_period_z = np.ones(len(top_periods))
+
+            best_period_of_all = find_consensus(top_periods,overall_period_z,0.003)[0][0]
+            print("THE PERIOD",best_period_of_all)
+
         #END STEP 1A: power_onset_vecs is the power onset vector for each of the 7 ranges (still need to add 3 other power groups)
 
         #STEP 2 TEMPO ESTIMATES FROM ALL ONSET VECTORS
-        
-        #Just do it on one period estimate for now to test, only do it once at 20s just to see if it works (it does)
-        corr = []
-        if (cur_time >= 20 and testBool == False):
 
-            #Performs an O(n*logn) correlation
-            corr = scipy.signal.fftconvolve(power_onset_vecs[0],power_onset_vecs[0][::-1], mode='full')
-            mid = len(corr)/2
-            mid_to_end = math.ceil(mid)
-
-
-            #The search space is approx 187.5 ms to 3000ms (spans eigth notes at 160bpm to measures at 80bom)
-            corr_search = corr[mid+16:mid+256]
-
-            #Grab the best peak so we can give it more influence in the weighting
-            best_peak_time = time_step*np.argmax(corr_search)+16*time_step
-
-            #Grab the top 8 peaks
-            K = 8
-            peak_idxs = np.argpartition(corr_search,-K)[-K:]
-            sorted_peak_idxs = np.sort(peak_idxs)
-
-            #Two peaks right next to each other are probably not distinct autocorrelation results, they are just noise
-            #from the same "actual peak". Therefore, average peaks that are really close (within 2 indexes = 22ms(
-            sorted_combined_peak_idxs = []
-
-            trav = 0
-            while (trav < len(sorted_peak_idxs)):
-                group_av = sorted_peak_idxs[trav]
-                group_cnt = 1.0
-                for trav2 in range(trav,trav+5):
-                    if (trav2 < 0): continue
-                    if (trav == trav2): continue
-                    if (trav2 >= len(sorted_peak_idxs)): break
-                    #print(trav-trav2)
-                    if(abs(sorted_peak_idxs[trav]-sorted_peak_idxs[trav2]) <= 2):
-                        group_av += sorted_peak_idxs[trav2]
-                        group_cnt += 1
-                        trav = trav2
-                group_av /= group_cnt
-                sorted_combined_peak_idxs.append(group_av)
-                trav+=1
-
-            print(sorted_combined_peak_idxs)
-
-            #After potential combining of peaks we can expect to have somewhere around 4-8 peaks
-
-            #These respresnt potential periods (tempos)
-
-            quarter_note_periods = []
-
-            
-            #Multiply and divide them to find out which quarter note they each correspond to (375-750ms)
-            #If smaller, multiply by 2, if larger divide by 2 to get them in this range
-            for p in sorted_combined_peak_idxs:
-                peak_time = p*time_step+16*time_step
-                while (peak_time > 0.750): peak_time/= 2
-                while (peak_time < 0.375): peak_time*= 2
-                quarter_note_periods.append(peak_time)
-
-            #Give the best peak time it's own entry (again) to reinforce it
-            while (best_peak_time > 0.750): best_peak_time/= 2
-            while (best_peak_time < 0.375): best_peak_time*= 2
-            quarter_note_periods.append(peak_time)
-
-            print(quarter_note_periods)
-
-            #Consider them all equally likely in the consensus process
-            quarter_note_z = np.ones(len(quarter_note_periods))
-
-            #Draw a consensus from these quarter note times
-            #find_consensus(quarter_note_periods,quarter_note_z)
-
-
-            corr_x = np.linspace(16*time_step,256*time_step,240)
-
-            #corr_x = np.linspace(0.0, 1.0/(2.0*T), N/2)
-
-            plt.subplot(211)
-            #plt.plot(windowed,color='r')
-            #plt.plot(corr_x,corr[mid:], color='r')
-            plt.plot(corr_x,corr_search)
-
-            plt.subplot(212)
-            #plt.plot(power_onset_vecs[0], color='b')
-            plt.plot(corr_x,corr_search)
-
-            plt.show()
-            testBool = True
-
-
-        #Just pick some times here and there to show interesting data
-        if (cur_window % 500 == 200):
+        #Just pick some times here and there to show
+        if (cur_window % 500 == 666):
 
             plt.figure(1)
 
@@ -245,8 +171,6 @@ def beat_detect(wav):
 
 
         #STEP 4: PEAK FINDING ON ALL ONSET VECTORS
-        
-        #This step works but I commented it out because it comes later (finding the phase from the tempo). Not quite there.
 
         #Real time peak finding on the range_onset_vecs autocorrelation (requires the last 3 elements of the onset vec)
         #Check the middle to see if it is a local max, registers as peak if it's large enough
@@ -256,7 +180,6 @@ def beat_detect(wav):
 
         #The cutoff automatically assumes value of half of new biggest value, it always drops off to 1000 within one second
         '''
-        
         for f in range(0,7):
             if (range_onset_queue[1][f] > range_onset_peaks_cutoff[f] and
                         range_onset_queue[1][f] > range_onset_queue[2][f] and range_onset_queue[1][f] > range_onset_queue[0][f]):
@@ -291,8 +214,7 @@ def beat_detect(wav):
 
         '''
         #Debug view plots
-            
-        #Set 30 to a different number < 20 to show some interesting plots
+
         if (cur_window % 20 == 30):
 
             print(range_onset_peaks_strength)
@@ -343,7 +265,7 @@ def main(argv):
 
     #Get the wave file set up (wave module does everything)
     if len(argv) != 1:
-        wavfile = "open/open_001.wav"
+        wavfile = "open/open_025.wav"
     else:
         wavfile = argv[0]
 
@@ -351,12 +273,14 @@ def main(argv):
     print("Successfully read the wav file:",wavfile,wav.getparams())
 
 
+
+
     #Get the algorithm's beat times
 
     found_beats = beat_detect(wav)
 
-    print("FOUND BEATS")
-    print(found_beats)
+    #print("FOUND BEATS")
+    #print(found_beats)
 
     #Grab the known beat times from the text file with the same name
 
@@ -372,6 +296,10 @@ def main(argv):
 
     print("CORRECT BEATS")
     print(known_beats)
+
+    print("Expected period of ",(known_beats[8]-known_beats[0])/8)
+    print("At end period of ",(known_beats[28]-known_beats[20])/8)
+
 
 
     #Create the plots (3 stacked plots each showing 10 seconds)
