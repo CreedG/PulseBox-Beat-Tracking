@@ -89,12 +89,12 @@ def beat_detect(wav):
 
 
         #STEP 1: GENERATE ONSET VECTORS THAT WILL BE USED LATER TO FIND THE BEATS
-        #1A GENERATES A 10 POWER CHANGE ONSET VECTORS FOR 10 DIFFERENT FREQUENCY BANDS
-        #1B GENERATES A CHORD CHANGE ONSET VECTOR
-        #1C GENERATES A DRUM ONSET VECTOR IF DRUMS SEEM TO EXIST
-        #AFTER STEP 1 WE WILL HAVE 12 ONSET VECTORS TO WORK WITH
+        #1A GENERATES A 10 POWER CHANGE ONSET VECTORS FOR DIFFERENT FREQUENCY BANDS
+        #1B GENERATES A CHORD CHANGE ONSET VECTOR (if we have time to do that)
+        #1C GENERATES A DRUM ONSET VECTOR IF DRUMS SEEM TO EXIST (if we have time t do that)
+        #AFTER STEP 1 WE WILL HAVE A BUNCH OF ONSET VECTORS TO WORK WITH
 
-        #STEP 1A: SIGNAL TO 10 ONSET VECTORS FOR POWER CHANGES (7 smaller bands, low band, medium band, all band)
+        #STEP 1A: SIGNAL TO 7 ONSET VECTORS FOR POWER CHANGES 
 
         x_psd, y_psd = scipy.signal.periodogram(windowed, 22050) #the power spectrum
 
@@ -127,6 +127,11 @@ def beat_detect(wav):
         new_range_onsets = new_range_onsets.reshape((7,1))
         power_onset_vecs = np.hstack([power_onset_vecs,new_range_onsets])
 
+        #END STEP 1A: power_onset_vecs is the power onset vector for each of the 7 ranges (still need to add 3 other power groups)
+
+        #STEP 2 TEMPO ESTIMATES FROM ALL ONSET VECTORS
+        
+        #Just do it on one period estimate for now to test, only do it once at 20s just to see if it works (it does)
         corr = []
         if (cur_time >= 20 and testBool == False):
 
@@ -176,6 +181,7 @@ def beat_detect(wav):
 
             quarter_note_periods = []
 
+            
             #Multiply and divide them to find out which quarter note they each correspond to (375-750ms)
             #If smaller, multiply by 2, if larger divide by 2 to get them in this range
             for p in sorted_combined_peak_idxs:
@@ -189,7 +195,6 @@ def beat_detect(wav):
             while (best_peak_time < 0.375): best_peak_time*= 2
             quarter_note_periods.append(peak_time)
 
-            print("candy ps")
             print(quarter_note_periods)
 
             #Consider them all equally likely in the consensus process
@@ -215,11 +220,8 @@ def beat_detect(wav):
             plt.show()
             testBool = True
 
-        #END STEP 1A: power_onset_vecs is the power onset vector for each of the 7 ranges (still need to add 3 other power groups)
 
-        #STEP 2 TEMPO ESTIMATES FROM ALL ONSET VECTORS
-
-        #Just pick some times here and there to show
+        #Just pick some times here and there to show interesting data
         if (cur_window % 500 == 200):
 
             plt.figure(1)
@@ -243,6 +245,8 @@ def beat_detect(wav):
 
 
         #STEP 4: PEAK FINDING ON ALL ONSET VECTORS
+        
+        #This step works but I commented it out because it comes later (finding the phase from the tempo). Not quite there.
 
         #Real time peak finding on the range_onset_vecs autocorrelation (requires the last 3 elements of the onset vec)
         #Check the middle to see if it is a local max, registers as peak if it's large enough
@@ -252,6 +256,7 @@ def beat_detect(wav):
 
         #The cutoff automatically assumes value of half of new biggest value, it always drops off to 1000 within one second
         '''
+        
         for f in range(0,7):
             if (range_onset_queue[1][f] > range_onset_peaks_cutoff[f] and
                         range_onset_queue[1][f] > range_onset_queue[2][f] and range_onset_queue[1][f] > range_onset_queue[0][f]):
@@ -286,7 +291,8 @@ def beat_detect(wav):
 
         '''
         #Debug view plots
-
+            
+        #Set 30 to a different number < 20 to show some interesting plots
         if (cur_window % 20 == 30):
 
             print(range_onset_peaks_strength)
