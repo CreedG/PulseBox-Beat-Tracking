@@ -128,7 +128,10 @@ def beat_detect(wav):
         new_range_onsets = new_range_onsets.reshape((7,1))
         power_onset_vecs = np.hstack([power_onset_vecs,new_range_onsets])
 
+        #END STEP 1A: power_onset_vecs is the power onset vector for each of the 7 ranges (still need to add 3 other power groups)
 
+        #STEP 2 TEMPO ESTIMATES FROM THE ONSET VECTORS
+        
         corr = []
         if (cur_time >= 20 and testBool == False):
             top_periods = []
@@ -143,9 +146,6 @@ def beat_detect(wav):
             best_period_of_all = find_consensus(top_periods,overall_period_z,0.003)[0][0]
             print("THE PERIOD",best_period_of_all)
 
-        #END STEP 1A: power_onset_vecs is the power onset vector for each of the 7 ranges (still need to add 3 other power groups)
-
-        #STEP 2 TEMPO ESTIMATES FROM ALL ONSET VECTORS
 
         #Just pick some times here and there to show
         if (cur_window % 500 == 666):
