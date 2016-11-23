@@ -52,6 +52,8 @@ def correlate_onsets(a, b):
 
     # Grab the top 8 peaks
     K = 8
+    if (len(corr_search) < 8):
+        K = len(corr_search)
     peak_idxs = np.argpartition(corr_search, -K)[-K:]
     sorted_peak_idxs = np.sort(peak_idxs)
 
@@ -103,7 +105,7 @@ def correlate_onsets(a, b):
     # Consider them all equally likely in the consensus process
     quarter_note_z = np.ones(len(quarter_note_periods))
 
-    print("qnote periods",quarter_note_periods)
+    #print("qnote periods",quarter_note_periods)
     return find_consensus(quarter_note_periods, quarter_note_z, 0.005)
 
 
