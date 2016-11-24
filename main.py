@@ -9,7 +9,7 @@ from time import sleep
 
 import scipy.fftpack
 import scipy.signal
-
+import Queue
 import time
 
 import math
@@ -23,35 +23,37 @@ import threading
 
 #A LOT OF GLOBAL VARIABLES (SHOULD BE FINE)
 
-song_over = False
-processing_done = False
-cur_time = 0
-detected_beat_times = []
+DEBUG = False
+CORRECTNESS_THRESHOLD = .05
+PATH = "/home/josh/Documents/beats/training_set/open/"
+F_RANGES = [0,125,250,500,1000,2000,4000,11000]
+periods = Queue.Queue()
 
-#ALGORITHM PARAMETERS
-f_ranges = [0,125,250,500,1000,2000,4000,11000]
+def debug(s):
+    if DEBUG: print(s)
 
+
+def initialize_values():
+    global song_over, cur_time, time_vec, prev_range_pow, power_onset_vecs, power_onset_peaks_strength, power_onset_peaks_time, power_onset_peaks_cutoff, signal_volume_vec
+    song_over = False
+    cur_time = 0
 #maintain an x axis for vector data
-time_vec = []
-
+    time_vec = []
 #for calculation of the newest onset for each frequency range
-prev_range_pow = np.zeros(7, dtype=np.int)
+    prev_range_pow = np.zeros(7, dtype=np.int)
 
 #the newest onset is placed at the front of this 3 element queue (minimum length to find peak in real time)
-power_onset_vecs = np.array([[],[],[],[],[],[],[]], dtype=np.int)
+    power_onset_vecs = np.array([[],[],[],[],[],[],[]], dtype=np.int)
 
 #the onset peak vectors that will be used for phase detection. not numpy arrays b/c they differ in length
-power_onset_peaks_strength = [[],[],[],[],[],[],[]]
-power_onset_peaks_time = [[],[],[],[],[],[],[]]
+    power_onset_peaks_strength = [[],[],[],[],[],[],[]]
+    power_onset_peaks_time = [[],[],[],[],[],[],[]]
 
 #the cutoffs will change to only capture a reasonable number of peaks per second (1-10)
-power_onset_peaks_cutoff = [100,100,100,100,100,100,100]
-
+    power_onset_peaks_cutoff = [100,100,100,100,100,100,100]
 
 #DEBUG GLOBALS (the whole volume history)
-signal_volume_vec = []
-
-
+    signal_volume_vec = []
 
 #THE ALGORITHM
 
@@ -69,9 +71,9 @@ signal_volume_vec = []
 
 #Currently, this generates a tempo guess from correlating the onset vectors. In the future, it should also guess the phase.
 def processing_thread():
-    global f_ranges, prev_range_pow, power_onset_peaks_strength, \
-        power_onset_peaks_time, power_onset_peaks_cutoff, power_onset_vecs, song_over, \
-        cur_time, processing_done
+    global prev_range_pow, power_onset_peaks_strength, \
+            power_onset_peaks_time, power_onset_peaks_cutoff, power_onset_vecs, song_over, \
+            cur_time
 
     #Don't even bother until one second in
     next_evaluation = 1.0
@@ -83,14 +85,14 @@ def processing_thread():
             time.sleep(.1)     #Needs to be modified for real time
             next_evaluation += 1
 
-        #print("EVALUATING AT ",cur_time)
+        #debug("EVALUATING AT " + str(cur_time))
 
         #PART 1: Period detection by autocorrelating correlating the onset vectors
 
         top_periods = []
         for i in range(0, 7):
             top_periods.append(correlate_onsets(power_onset_vecs[i], power_onset_vecs[i])[0][0])
-        #print("top periods!", top_periods)
+        #debug("top periods!", top_periods)
         testBool = True
 
         # Consider them all equally likely in the consensus process (for now)
@@ -98,7 +100,7 @@ def processing_thread():
 
         best_period_of_all = find_consensus(top_periods, overall_period_z, 0.01)[0][0]
 
-        print("best period guess at",cur_time,"is",best_period_of_all)
+        #print(str(threading.current_thread()) + " best period guess at" + str(cur_time) + "is" + str(best_period_of_all))
 
 
         #PART 2: Phase detection by applying the guessed period to the beats
@@ -120,20 +122,13 @@ def processing_thread():
         by subtracting the known period (with an error tolerance) and check for matching peaks as you traverse
         back to the beginning. Something on the phase should have more hits and more total power.'''
 
-
-
-
-    print("Processing thread closed")
-    processing_done = True
-
-
-
-
+    debug("Processing thread closed")
+    periods.put(best_period_of_all)
 
 def aquisition_thread(wav):
-    global f_ranges, prev_range_pow, power_onset_peaks_strength, \
-        power_onset_peaks_time, power_onset_peaks_cutoff, power_onset_vecs, song_over, \
-        cur_time, processing_done
+    global prev_range_pow, power_onset_peaks_strength, \
+            power_onset_peaks_time, power_onset_peaks_cutoff, power_onset_vecs, song_over, \
+            cur_time
 
     song_over = False
 
@@ -168,9 +163,9 @@ def aquisition_thread(wav):
         #COULD BE FURTHER SPED UP, SHOULD USE NUMPY TRICKS
         sum = 0
         for index, freq in enumerate(x_psd):
-            #print(index,freq,range_num,y_psd[index])
+            #debug(index,freq,range_num,y_psd[index])
             sum += y_psd[index]
-            if freq > f_ranges[range_num]:
+            if freq > F_RANGES[range_num]:
                 range_pow[range_num-1] = sum
                 sum = 0
                 range_num += 1
@@ -201,7 +196,7 @@ def aquisition_thread(wav):
 
         for f in range(0,7):
             if (power_onset_vecs[f][check_peak_idx] > power_onset_peaks_cutoff[f] and
-                        power_onset_vecs[f][check_peak_idx] > power_onset_vecs[f][check_peak_idx+1] and power_onset_vecs[f][check_peak_idx] > power_onset_vecs[f][check_peak_idx-1]):
+                    power_onset_vecs[f][check_peak_idx] > power_onset_vecs[f][check_peak_idx+1] and power_onset_vecs[f][check_peak_idx] > power_onset_vecs[f][check_peak_idx-1]):
 
                 power_onset_peaks_cutoff[f] = power_onset_vecs[f][check_peak_idx]
 
@@ -216,13 +211,12 @@ def aquisition_thread(wav):
         sample_arr = sample_arr[256:]
         sample_arr = np.append(sample_arr,np.fromstring(wav.readframes(512), dtype='int16')[::2])
 
-    print("Data aquisition thread closed (the song is over)")
+    debug("Data aquisition thread closed (the song is over)")
     song_over = True
 
 
 def beat_detect_simulate_realtime(wav):
-
-    global detected_beat_times, processing_done
+    initialize_values()
 
     t0 = time.time() #benchmark
 
@@ -239,42 +233,19 @@ def beat_detect_simulate_realtime(wav):
     also prepare all the relevant data for the processing thread to use along the way'''
     aquisition_thread(wav)
 
-
-    while(processing_done == False):
-        pass
-
+    t.join()
 
     t1 = time.time() #benchmark
-    print("Total algorithm time",t1-t0)
+    debug("Total algorithm time" + str(t1-t0))
 
-    return detected_beat_times
+    return detected_beat_times, periods.get()
 
 #END ALGORITHM
 
-
-#SET UP THE PLOT
-
-def main(argv):
-
-    wavfile = ""
-
-    #Get the wave file set up (wave module does everything)
-    if len(argv) != 1:
-        wavfile = "open/open_001.wav"
-    else:
-        wavfile = argv[0]
-
-    wav = wave.open(wavfile)
-    print("Successfully read the wav file:",wavfile,wav.getparams())
-
-    #Get the algorithm's beat times
-
-    found_beats = beat_detect_simulate_realtime(wav)
-
-    #Grab the known beat times from the text file with the same name
-
+#AUX FUNCS
+def grab_beats(wavfile):
     known_beats = []
-    txtfile_name = wavfile.split('.')[0]+".txt"
+    txtfile_name = PATH + wavfile.split('.')[0] + ".txt"
 
     with open(txtfile_name) as f:
         for line in f:
@@ -282,15 +253,12 @@ def main(argv):
             if 'str' in line:
                 break
 
-    print("The correct period from the text file was ",(known_beats[28]-known_beats[20])/8)
+    pd = (known_beats[28]-known_beats[20])/8
+    debug("The correct period from the text file was " + str(pd))
+    return (known_beats, pd)
 
-
-
-    #Create the plots (3 stacked plots each showing 10 seconds)
-    #This was annoying to set up but is best for showing more of the data
-    #Don't worry about the details, it's just some matplotlib bullshit
-
-
+#SET UP THE PLOT
+def matplotlib_bullshit(wav, found_beats, known_beats):
     wav.rewind()
 
     total_samples = wav.getnframes()
@@ -320,8 +288,8 @@ def main(argv):
         plt.plot([xpos,xpos],[-39000,36000], 'k-', lw=1.5, color='b')
     '''
 
-    print("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
-          "The red bar underneath is the real beat.")
+    debug("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
+            "The red bar underneath is the real beat.")
     for b in power_onset_peaks_time[0]:
         xpos = 44100/display_div*b
         plt.plot([xpos,xpos],[-40000,-30000], 'k-', lw=1.5, color='g')
@@ -353,6 +321,47 @@ def main(argv):
     ax.set_xticklabels(ticks)
     plt.show()
 
+def run_algorithm(wavfile):
+    wav = wave.open(PATH + wavfile + ".wav")
+    debug("Successfully read the wav file: " + wavfile)
+    debug("(nchannels, sampwidth, framerate, nframes, comptype, compname)\n" + str(wav.getparams()))
+
+    #Get the algorithm's beat times
+    found_beats, found_pd = beat_detect_simulate_realtime(wav)
+
+    #Grab the known beat times from the text file with the same name
+    known_beats, known_pd = grab_beats(wavfile)
+
+    #Create the plots (3 stacked plots each showing 10 seconds)
+    #This was annoying to set up but is best for showing more of the data
+    #Don't worry about the details, it's just some matplotlib bullshit
+    if DEBUG: matplotlib_bullshit(wav, found_beats, known_beats)
+
+    print(found_pd, known_pd)
+    if abs(found_pd - known_pd) < CORRECTNESS_THRESHOLD:
+        print(wavfile + " Passed")
+        return True
+    print(wavfile + " Failed")
+    return False
+
+def test():
+    results = []
+    pref = "open_00"
+    for i in range(1,26):
+        if i == 10:
+            pref = pref[:-1]
+        if not run_algorithm(pref+str(i)):
+            results.append(i)
+    print("These didn't sync bpm properly")
+    print(results)
+    print(len(results))
+
+def main(argv):
+    if len(argv) != 1:
+        test()
+    else:
+        wavfile = argv[0]
+        run_algorithm(wavfile)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
