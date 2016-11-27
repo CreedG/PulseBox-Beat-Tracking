@@ -11,11 +11,13 @@ import math
 from BeatFind_Utils_11_26 import correlate_onsets
 from BeatFind_Utils_11_26 import find_consensus
 import threading
+import os
+cwd = os.getcwd()
 
 
 DEBUG = False
 CORRECTNESS_THRESHOLD = .05
-PATH = "C:/Users/Creed/Documents/!LIGHT_TOWER/Development/all/" #Change to where your wav files are
+PATH = os.getcwd() + "/all/" #Change to where your wav files are
 period_guesses = []
 
 def debug(s):
@@ -195,7 +197,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
     sample_data = wav.readframes(wav.getnframes())
     sample_arr = np.fromstring(sample_data, dtype='int16')
     downsample_arr = sample_arr[::display_div]
-    plt.plot(downsample_arr, color='#aaaaaa')
+    #plt.plot(downsample_arr, color='#aaaaaa')
     plt.grid()
 
 

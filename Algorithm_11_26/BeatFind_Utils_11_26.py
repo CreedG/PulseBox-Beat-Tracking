@@ -65,7 +65,7 @@ def index_to_time(idx):
 
 def time_to_index(time):
     global time_step
-    return round(time/time_step) - 16
+    return int(round(time/time_step) - 16)
 
 
 def correlate_onsets(a, b):
@@ -75,7 +75,7 @@ def correlate_onsets(a, b):
 
     # Performs an O(n*logn) correlation
     corr = scipy.signal.fftconvolve(a, b[::-1], mode='full')
-    mid = len(corr) / 2
+    mid = len(corr) // 2
 
     # The period search space is approx 187.5 ms to 3000ms (spans eigth notes at 160bpm to measures at 80bpm)
     # Divide by 1000000 to get numbers that are easier to read
