@@ -8,17 +8,17 @@ import scipy.fftpack
 import scipy.signal
 import time
 import math
-from BeatFind_Utils_11_26 import correlate_onsets
-from BeatFind_Utils_11_26 import find_consensus
+from utils import correlate_onsets, find_consensus, detect_phase, KalmanFilter
 import threading
 import os
-cwd = os.getcwd()
 
-
-DEBUG = False
+DEBUG = True
 CORRECTNESS_THRESHOLD = .05
 PATH = os.getcwd() + "/all/" #Change to where your wav files are
+old_period_guesses = []
 period_guesses = []
+beat_guesses = []
+k = KalmanFilter()
 
 def debug(s):
     if DEBUG: print(s)
@@ -40,7 +40,7 @@ def initialize_values():
 
 #Currently not threaded, just called every 300ms to update beat time guesses
 def processing_thread():
-    global prev_range_pow, peaks_strength, peaks_time, peaks_cutoff, power_onset_vecs, song_over, cur_time
+    global prev_range_pow, peaks_strength, peaks_time, peaks_cutoff, power_onset_vecs, song_over, cur_time, known_pd, k
 
     # PART 1: Period detection by autocorrelating correlating the onset vectors
 
@@ -64,13 +64,16 @@ def processing_thread():
     the_consensus = find_consensus(times, voting_power, .05)
 
     best_period = the_consensus[0][0]
+    new_cool_period = k.iter(the_consensus[0][0])
 
-    period_guesses.append(best_period)
+    period_guesses.append(new_cool_period)
+    old_period_guesses.append(best_period)
 
 
 
 # PART 2: Phase detection by applying the guessed period to the beats
 # Analyze peaks_time and strength to see if they match the guessed period
+    beat_guesses.append(detect_phase(known_pd, peaks_time, peaks_strength, cur_time))
 
 def acquisition_thread(wav):
     global prev_range_pow, peaks_strength, \
@@ -189,6 +192,7 @@ def grab_known_beats(wavfile):
 
 #SET UP THE PLOT
 def plot_beats_and_peaks(wav, found_beats, known_beats):
+    global period_guesses, old_period_guesses, beat_guesses, known_pd
     wav.rewind()
 
     display_div = 50
@@ -199,38 +203,48 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
     downsample_arr = sample_arr[::display_div]
     #plt.plot(downsample_arr, color='#aaaaaa')
     plt.grid()
+    plt.plot([known_pd] * len(period_guesses), color='#00ff00')
+    plt.plot([known_pd * 2] * len(period_guesses), color='#00ff00')
+    plt.plot([known_pd / 2] * len(period_guesses), color='#00ff00')
+    plt.plot(period_guesses, color='#aaaaaa')
+    plt.plot(old_period_guesses, color='#ff0000')
+    plt.ylim([min(old_period_guesses), max(old_period_guesses)])
+    plt.show()
 
+    for b in beat_guesses:
+        xpos = 44100/display_div*b
+        plt.plot([xpos,xpos],[-36000,0], 'k-', lw=1.5, color='#aaaaaa')
 
+    if False:
+        debug("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
+                "The red bar underneath is the real beat.")
+        for b in peaks_time[0]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[-40000,-30000], 'k-', lw=1.5, color='green')
+        for b in peaks_time[1]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[-30000,-20000], 'k-', lw=1.5, color='purple')
+        for b in peaks_time[2]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[-20000,-10000], 'k-', lw=1.5, color='blue')
+        for b in peaks_time[3]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[-10000,0], 'k-', lw=1.5, color='green')
+        for b in peaks_time[4]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[0,10000], 'k-', lw=1.5, color='purple')
+        for b in peaks_time[5]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[10000,20000], 'k-', lw=1.5, color='blue')
+        for b in peaks_time[6]:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[20000,30000], 'k-', lw=1.5, color='green')
+        for b in found_beats:
+            xpos = 44100/display_div*b
+            plt.plot([xpos,xpos],[40000,50000], 'k-', lw=1.5, color='black')
     for b in known_beats:
         xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[-36000,39000], 'k-', lw=1.5, color='r')
-
-    debug("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
-            "The red bar underneath is the real beat.")
-    for b in peaks_time[0]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[-40000,-30000], 'k-', lw=1.5, color='green')
-    for b in peaks_time[1]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[-30000,-20000], 'k-', lw=1.5, color='purple')
-    for b in peaks_time[2]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[-20000,-10000], 'k-', lw=1.5, color='blue')
-    for b in peaks_time[3]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[-10000,0], 'k-', lw=1.5, color='green')
-    for b in peaks_time[4]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[0,10000], 'k-', lw=1.5, color='purple')
-    for b in peaks_time[5]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[10000,20000], 'k-', lw=1.5, color='blue')
-    for b in peaks_time[6]:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[20000,30000], 'k-', lw=1.5, color='green')
-    for b in found_beats:
-        xpos = 44100/display_div*b
-        plt.plot([xpos,xpos],[40000,50000], 'k-', lw=1.5, color='black')
+        plt.plot([xpos,xpos],[0,39000], 'k-', lw=1.5, color='r')
 
     ax = plt.gca()
     ax.xaxis.set_ticks([n*44100/display_div for n in range (0,31)])
@@ -239,15 +253,16 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
     plt.show()
 
 def run_algorithm(wavfile):
+    global known_pd
     wav = wave.open(PATH + wavfile + ".wav")
     debug("Successfully read the wav file: " + wavfile)
     debug("(nchannels, sampwidth, framerate, nframes, comptype, compname)\n" + str(wav.getparams()))
 
-    #Get the algorithm's beat times
-    found_beats, found_pd = beat_detect_simulate_realtime(wav)
-
     #Grab the known beat times from the text file with the same name
     known_beats, known_pd = grab_known_beats(wavfile)
+
+    #Get the algorithm's beat times
+    found_beats, found_pd = beat_detect_simulate_realtime(wav)
 
     if DEBUG:
         print("Guessed period (at the end of the song) is",found_pd)

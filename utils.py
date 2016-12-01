@@ -10,6 +10,7 @@ import scipy.fftpack
 import scipy.signal
 
 import time
+from ring import Ring
 
 import math
 
@@ -132,3 +133,34 @@ def correlate_onsets(a, b):
     period_guesses_to_return.append([best_measure_period,best_measure_strength])
 
     return period_guesses_to_return
+
+class KalmanFilter:
+    def __init__(self):
+        self.Q = 5 * 0.1**5 # process variance, pls tweak
+        self.R = 1 * 0.1**3 # measurement variance, pls tweak
+        self.P=1
+        self.xhat=0
+        self.K=0
+
+    def iter(self, z):
+        self.K = self.P/( self.P+self.R )
+        self.xhat+=self.K*(z-self.xhat)
+        self.P = (1-self.K)*self.P + self.Q
+        return self.xhat
+
+kphase = KalmanFilter()
+prev_len = [0]*7
+def detect_phase(period, times, strengths, time):
+    global r, prev_len
+    try:
+        r
+    except NameError:
+        r = Ring(1000, period, 23)
+    for b in range(0,len(times)):
+        for i in range(prev_len[b], len(times[b])):
+            r.insert(times[b][i], strengths[b][i])
+        prev_len[b] = len(times[b])
+    while r.iter(period, time) != 0:
+        pass
+    #r.plot()
+    return r.ne_beat()
