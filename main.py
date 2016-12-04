@@ -263,18 +263,21 @@ def run_algorithm(wavfile):
 
     #Get the algorithm's beat times
     found_beats, found_pd = beat_detect_simulate_realtime(wav)
+    print(found_beats)
 
     if DEBUG:
         print("Guessed period (at the end of the song) is",found_pd)
         plot_beats_and_peaks(wav, found_beats, known_beats)
 
-    print(found_pd, known_pd)
+    """print(found_pd, known_pd)
     if (abs(found_pd - known_pd) < CORRECTNESS_THRESHOLD or abs(found_pd*2 - known_pd) < CORRECTNESS_THRESHOLD or
             abs(found_pd/2 - known_pd) < CORRECTNESS_THRESHOLD):
         print(wavfile + " Passed")
         return True
     print(wavfile + " Failed")
-    return False
+    return False"""
+    return found_beats
+
 
 def test():
     results = []

@@ -38,8 +38,8 @@ def continuity(detections, annotations, tempo_tolerance, phase_tolerance, min_be
     # Make different variations of annotations
     off_beats = double_annotations[1::2]  # Off-beats
     double_tempo = double_annotations  # Double tempo
-    half_tempo_e = double_annotations[0::2]  # Half tempo (even)
-    half_tempo_o = double_annotations[1::2]  # Half tempo (odd)
+    half_tempo_e = annotations[0::2]  # Half tempo (even)
+    half_tempo_o = annotations[1::2]  # Half tempo (odd)
     all_variations = [annotations, off_beats, double_tempo, half_tempo_e, half_tempo_o]
 
     cmlCVec = []
@@ -48,7 +48,6 @@ def continuity(detections, annotations, tempo_tolerance, phase_tolerance, min_be
         C, T = ContinuityEval(detections, variation, tempo_tolerance, phase_tolerance)
         cmlCVec.append(C)
         cmlTVec.append(T)
-
     cmlC = cmlCVec[0]
     cmlT = cmlTVec[0]
     amlC = max(cmlCVec)
@@ -58,8 +57,8 @@ def continuity(detections, annotations, tempo_tolerance, phase_tolerance, min_be
 
 def ContinuityEval(detections,annotations,tempo_tolerance,phase_tolerance):
     """Calculate continuity-based accuracy"""
-    correct_phase = np.zeros(np.amax(detections.size, annotations.size))
-    correct_tempo = np.zeros(np.amax(detections.size, annotations.size))
+    correct_phase = np.zeros(max(detections.size, annotations.size))
+    correct_tempo = np.zeros(max(detections.size, annotations.size))
     for i in range(detections.size):
         # find the closest annotation and the signed offset
         closest = np.argmin(np.abs(annotations-detections[i]))
@@ -92,16 +91,40 @@ def ContinuityEval(detections,annotations,tempo_tolerance,phase_tolerance):
         correct_beats = np.logical_and(correct_phase, correct_tempo)
         # we'll look for the longest continuously correct segment to do so, we'll add zeros on the front and end in case
         # the sequence is all ones
-        correct_beats = np.array([0, correct_beats, 0])
+        correct_beats = np.concatenate([[0], correct_beats, [0]])
         # now find the boundaries
         d2 = np.argwhere(correct_beats == 0)
+        d2 = d2.reshape(d2.size)
+        correct_beats = correct_beats[1:-1]
         # in best case, d2 = 1 & length(checkbeats)
         contAcc = (np.amax(np.diff(d2)) - 1) / correct_beats.size
         totAcc = np.sum(correct_beats) / correct_beats.size
     return contAcc, totAcc
 
 
-if __name__ = "__main__":
-    annotations = open('all/open_001.txt').read().splitlines()
+if __name__ == "__main__":
+    """annotations = open('all/open_001.txt').read().splitlines()
+    for i in range(len(annotations)):
+        annotations[i] = float(annotations[i])
     detections = annotations
     mainscore, backupscores = beatEvaluator(detections, annotations)
+    print(mainscore)
+    print(backupscores)"""
+    import main
+    import os
+    path = "all" + '\\'
+    all_files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    open_files = [f for f in all_files if 'open' in f and '.wav' in f]
+    print('Beginning tests for %d files' % len(open_files))
+    mainscores = []
+    for f in open_files:
+        detections = main.main(f.replace('.wav', ''))
+        f_beats = f.replace('.wav', '.txt')
+        annotations = open(f_beats).read().splitlines()
+        for i in range(len(annotations)):
+            annotations[i] = float(annotations[i])
+        mainscore, backupscores = beatEvaluator(detections, annotations)
+        mainscores.append(mainscore)
+        print("'%s' scored %f" % (f, mainscore))
+    print('Done testing all files')
+    print('Average score of %f' % (np.mean(mainscores)))
