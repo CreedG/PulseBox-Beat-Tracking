@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import main
 
 
 def beatEvaluator(detections,annotations):
@@ -103,42 +105,16 @@ def ContinuityEval(detections,annotations,tempo_tolerance,phase_tolerance):
 
 
 if __name__ == "__main__":
-    """annotations = open('all/open_001.txt').read().splitlines()
-    for i in range(len(annotations)):
-        annotations[i] = float(annotations[i])
-    #detections = annotations
-    detections = np.array([  0.59884803,   1.80513065,   1.8447225 ,   2.42887073,
-         3.77637989,   3.61590175,   4.73372285,   4.98599112,
-         6.19560248,   6.69962264,   7.39160355,   7.73040148,
-         8.47535082,   8.68858072,   9.30488362,  10.23136976,
-        10.2400529 ,  10.86508505,  11.67727254,  12.08136304,
-        12.7874573 ,  13.37291549,  13.76953183,  14.4823762 ,
-        15.06468535,  16.09337225,  17.13062879,  17.1282428 ,
-        17.41377464,  18.10895941,  18.9790865 ,  19.458036  ,
-        20.26482402,  20.56917572,  21.88514695,  21.60602129,
-        22.9122398 ,  23.20442078,  23.63581775,  24.39357269,
-        25.39071492,  25.69254234,  25.88755057,  26.57800511,
-        27.08616435,  27.86254849,  29.0848233 ,  28.96485414,
-        30.01678758,  30.78029919])
-    mainscore, backupscores = beatEvaluator(detections, annotations)
-    print(mainscore)
-    print(backupscores)
-    """
-    import main
-    import os
-    path = "all" + '\\'
-    all_files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-    open_files = [f for f in all_files if 'open' in f and '.wav' in f]
-    print('Beginning tests for %d files' % len(open_files))
+    path = "all/"
+    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    wavs = [x[:-4] for x in files if x[-4:] == ".wav"]
+    print('Beginning tests for %d files' % len(wavs))
+    results = []
     mainscores = []
-    for f in open_files:
-        detections = main.main(f.replace('.wav', ''))
-        f_beats = f.replace('.wav', '.txt')
-        annotations = open(f_beats).read().splitlines()
-        for i in range(len(annotations)):
-            annotations[i] = float(annotations[i])
-        mainscore, backupscores = beatEvaluator(detections, annotations)
+    for i in wavs:
+        ours, theirs = main.run_algorithm(i, True)
+        mainscore, backupscores = beatEvaluator(ours, theirs)
         mainscores.append(mainscore)
-        print("'%s' scored %f" % (f, mainscore))
+        print("'%s' scored %f" % (i, mainscore))
     print('Done testing all files')
     print('Average score of %f' % (np.mean(mainscores)))

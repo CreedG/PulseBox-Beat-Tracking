@@ -12,7 +12,7 @@ from utils import correlate_onsets, find_consensus, detect_phase, KalmanFilter, 
 import threading
 import os
 
-DEBUG = True
+DEBUG = False
 CORRECTNESS_THRESHOLD = .05
 PATH = os.getcwd() + "/all/" #Change to where your wav files are
 
@@ -159,14 +159,13 @@ def acquisition_thread(wav):
 
 
 def beat_detect_simulate_realtime(wav):
-    global detected_beat_times, detect_phase_time
+    global beat_guesses, detect_phase_time
 
     initialize_values()
 
     t0 = time.time() #benchmark
 
     wav.rewind()
-    detected_beat_times = []
 
     #Will block until the song is done
     acquisition_thread(wav)
@@ -176,7 +175,7 @@ def beat_detect_simulate_realtime(wav):
     debug("Total algorithm time "+str(t1-t0))
     debug("Detect phase time "+ str(detect_phase_time))
 
-    return detected_beat_times, period_guesses[-1]
+    return beat_guesses, period_guesses[-1]
 
 #END ALGORITHM
 
@@ -197,7 +196,7 @@ def grab_known_beats(wavfile):
 
 #SET UP THE PLOT
 def plot_beats_and_peaks(wav, found_beats, known_beats):
-    global period_guesses, old_period_guesses, beat_guesses, known_pd
+    global period_guesses, old_period_guesses, known_pd
     wav.rewind()
 
     display_div = 50
@@ -251,7 +250,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         for b in known_beats:
             xpos = 44100/display_div*b
             plt.plot([xpos,xpos],[0,39000], 'k-', lw=1.5, color='r')
-        for b in beat_guesses:
+        for b in found_beats:
             xpos = 44100/display_div*b
             plt.plot([xpos,xpos],[-36000,0], 'k-', lw=1.5, color='#aaaaaa')
         ax = plt.gca()
@@ -260,7 +259,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         ax.set_xticklabels(ticks)
         plt.show()
 
-def run_algorithm(wavfile):
+def run_algorithm(wavfile, evaluation):
     global known_pd
     wav = wave.open(PATH + wavfile + ".wav")
     debug("Successfully read the wav file: " + wavfile)
@@ -273,18 +272,18 @@ def run_algorithm(wavfile):
     #Get the algorithm's beat times
     found_beats, found_pd = beat_detect_simulate_realtime(wav)
 
-    if DEBUG:
-        print("Guessed period (at the end of the song) is",found_pd)
-        plot_beats_and_peaks(wav, found_beats, known_beats)
+    debug("Guessed period (at the end of the song) is" + str(found_pd))
+    plot_beats_and_peaks(wav, found_beats, known_beats)
+    if not evaluation:
 
-    """print(found_pd, known_pd)
-    if (abs(found_pd - known_pd) < CORRECTNESS_THRESHOLD or abs(found_pd*2 - known_pd) < CORRECTNESS_THRESHOLD or
-            abs(found_pd/2 - known_pd) < CORRECTNESS_THRESHOLD):
-        print(wavfile + " Passed")
-        return True
-    print(wavfile + " Failed")
-    return False"""
-    return found_beats
+        if (abs(found_pd - known_pd) < CORRECTNESS_THRESHOLD or abs(found_pd*2 - known_pd) < CORRECTNESS_THRESHOLD or
+                abs(found_pd/2 - known_pd) < CORRECTNESS_THRESHOLD):
+            debug(wavfile + " Passed")
+            return True
+        debug(wavfile + " Failed")
+        return False
+    print((found_beats, known_beats))
+    return found_beats, known_beats
 
 
 def test():
@@ -293,18 +292,18 @@ def test():
     for i in range(1,26):
         if i == 10:
             pref = pref[:-1]
-        if not run_algorithm(pref+str(i)):
+        if not run_algorithm(pref+str(i), False):
             results.append(i)
-    print("These didn't sync bpm properly")
-    print(results)
-    print(len(results))
+    debug("These didn't sync bpm properly")
+    debug(results)
+    debug(len(results))
 
 def main(argv):
     if len(argv) != 1:
         test()
     else:
         wavfile = argv[0]
-        run_algorithm(wavfile)
+        run_algorithm(wavfile, False)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -111,12 +111,12 @@ def correlate_onsets(a, b):
     overall_percent_above = (best_overall_strength-corr_avg)/(corr_max-corr_avg)
     measure_percent_above = (best_measure_strength-corr_avg)/(corr_max-corr_avg)
 
-    #print("overall percent above:",overall_percent_above)
-    #print("measure percent above:",measure_percent_above)
+    #debug("overall percent above:",overall_percent_above)
+    #debug("measure percent above:",measure_percent_above)
 
     replaced = False
     if (overall_percent_above < .3):
-        #print("Bringing in second best peak")
+        #debug("Bringing in second best peak")
         next_best_indices = (np.argsort(corr_search, axis=0)[::-1])[1:20]
         for i in next_best_indices:
             consider_time = corr_search_x[i]

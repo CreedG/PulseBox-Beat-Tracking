@@ -30,7 +30,7 @@ class Ring:
         m = max(self.data)
         p = min([float(i)/self.l * self.period -self.period/2 for i, j in enumerate(self.data) if j == m], key=abs)
         if(abs(p) > .01):
-            print(p)
+            debug(p)
             exit(1)
 
     def shift_phase(self, period):
