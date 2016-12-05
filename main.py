@@ -263,7 +263,6 @@ def run_algorithm(wavfile):
 
     #Get the algorithm's beat times
     found_beats, found_pd = beat_detect_simulate_realtime(wav)
-    print(found_beats)
 
     if DEBUG:
         print("Guessed period (at the end of the song) is",found_pd)
