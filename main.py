@@ -245,7 +245,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
             xpos = 44100/display_div*b
             plt.plot([xpos,xpos],[40000,50000], 'k-', lw=1.5, color='black')
 
-    if True:
+    if False:
         plt.figure(2)
         for b in known_beats:
             xpos = 44100/display_div*b
@@ -282,7 +282,6 @@ def run_algorithm(wavfile, evaluation):
             return True
         debug(wavfile + " Failed")
         return False
-    print((found_beats, known_beats))
     return found_beats, known_beats
 
 

@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import sys
 import main
 
 
@@ -103,8 +104,13 @@ def ContinuityEval(detections,annotations,tempo_tolerance,phase_tolerance):
         totAcc = np.sum(correct_beats) / correct_beats.size
     return contAcc, totAcc
 
+def run_test(wav):
+    ours, theirs = main.run_algorithm(wav, True)
+    mainscore, backupscores = beatEvaluator(ours, theirs)
+    print("'%s' scored %f" % (wav, mainscore))
+    return mainscore
 
-if __name__ == "__main__":
+def test_beats():
     path = "all/"
     files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
     wavs = [x[:-4] for x in files if x[-4:] == ".wav"]
@@ -112,9 +118,16 @@ if __name__ == "__main__":
     results = []
     mainscores = []
     for i in wavs:
-        ours, theirs = main.run_algorithm(i, True)
-        mainscore, backupscores = beatEvaluator(ours, theirs)
+        mainscore = run_test(i)
         mainscores.append(mainscore)
-        print("'%s' scored %f" % (i, mainscore))
     print('Done testing all files')
     print('Average score of %f' % (np.mean(mainscores)))
+
+
+if __name__ == "__main__":
+    argv = sys.argv[1:]
+    if len(argv) != 1:
+        test_beats()
+    else:
+        wavfile = argv[0]
+        run_test(wavfile)
