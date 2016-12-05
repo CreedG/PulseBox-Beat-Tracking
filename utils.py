@@ -21,7 +21,7 @@ debugNum = 0
 
 
 def find_consensus(data, confidence, max_group_size):
-    global time_step
+    time_step
     bins = []
     # bins[[val,z],[val,z]...]
     for idx, d in enumerate(data):
@@ -61,17 +61,13 @@ def match_periods(pd1,pd2,window):
 
 
 def index_to_time(idx):
-    global time_step
     return (16+idx) * time_step
 
 def time_to_index(time):
-    global time_step
     return int(round(time/time_step) - 16)
 
 
 def correlate_onsets(a, b):
-    global time_step
-
     period_guesses_to_return = []
 
     # Performs an O(n*logn) correlation
@@ -148,19 +144,21 @@ class KalmanFilter:
         self.P = (1-self.K)*self.P + self.Q
         return self.xhat
 
-kphase = KalmanFilter()
-prev_len = [0]*7
+#Initializes my ring class with the known period currently
+def init_phase_globals(period):
+    global r, prev_len
+    prev_len = [0]*7
+    r = Ring(period)
+
+#Returns the next beat by interfacing with the ring class
 def detect_phase(period, times, strengths, time):
     global r, prev_len
-    try:
-        r
-    except NameError:
-        r = Ring(1000, period, 23)
+
+    r.iter(period, time)
+
     for b in range(0,len(times)):
         for i in range(prev_len[b], len(times[b])):
             r.insert(times[b][i], strengths[b][i])
         prev_len[b] = len(times[b])
-    while r.iter(period, time) != 0:
-        pass
-    #r.plot()
-    return r.ne_beat()
+
+    return r.generate_next_beat(time)
