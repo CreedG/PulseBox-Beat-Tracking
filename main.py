@@ -208,14 +208,16 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         downsample_arr = sample_arr[::display_div]
         #plt.plot(downsample_arr, color='#aaaaaa')
         plt.grid()
-        plt.plot([known_pd] * len(period_guesses), color='#00ff00')
-        plt.plot([known_pd * 2] * len(period_guesses), color='#00ff00')
-        plt.plot([known_pd / 2] * len(period_guesses), color='#00ff00')
-        plt.plot(period_guesses, color='#aaaaaa')
-        plt.plot(old_period_guesses, color='#ff0000')
+        known_pd_diff = np.diff(known_beats)
+        scale1 = 30/len(period_guesses)
+        scale2 = 30/len(old_period_guesses)
+        plt.plot(known_beats[:-1], known_pd_diff, color='#00ff00')
+        plt.plot(known_beats[:-1], known_pd_diff / 2, color='#00ff00')
+        plt.plot(known_beats[:-1], known_pd_diff * 2, color='#00ff00')
+        plt.plot(scale1*np.arange(len(period_guesses)), period_guesses, color='#aaaaaa')
+        plt.plot(scale2*np.arange(len(old_period_guesses)), old_period_guesses, color='#ff0000')
         plt.ylim([0, 1])
         plt.show()
-
 
     if False:
         debug("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
