@@ -8,6 +8,7 @@ from time import sleep
 
 import scipy.fftpack
 import scipy.signal
+import scipy.io
 
 import time
 from ring import Ring
@@ -31,7 +32,8 @@ def find(a, func):
 def detect_phase2(period, onsetenv):
     tightness = 6
     alpha = .7
-    pd = int(period * 86)
+    oesv = 250#86
+    pd = int(period * oesv)
     templt = [math.exp(-0.5*((x/(pd/32))**2)) for x in range(-pd, pd)]
     localscore = np.convolve(templt,onsetenv)
     backlink = [0] * len(localscore)
@@ -58,5 +60,13 @@ def detect_phase2(period, onsetenv):
     while backlink[b[-1]] > 0:
         b = b + [backlink[b[-1]]]
     b.reverse()
-    return [x / 86 for x in b]
+    return [x / oesv for x in b]
 
+
+if __name__ == "__main__":
+    onsetenv = scipy.io.loadmat(r'C:\Users\William Heimsoth\Documents\Fall 2016\ENEE408A\onsetenv.mat')['onsetenv']
+    onsetenv = onsetenv.reshape(onsetenv.size)
+    print(onsetenv.shape)
+    period = 0.5
+    beats = detect_phase2(period, onsetenv)
+    print(beats)
