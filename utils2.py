@@ -32,10 +32,14 @@ def find(a, func):
 def detect_phase2(period, onsetenv):
     tightness = 6
     alpha = .7
-    oesv = 250#86
-    pd = int(period * oesv)
+    oesr = 250#86
+    pd = int(period * oesr)
     templt = [math.exp(-0.5*((x/(pd/32))**2)) for x in range(-pd, pd)]
     localscore = np.convolve(templt,onsetenv)
+    temp = [round(len(templt)/2) + x for x in range(len(onsetenv))]
+    #print(temp)
+    # Our vector lengths should be half of theirs but its not.
+    localscore = localscore[temp]
     backlink = [0] * len(localscore)
     cumscore = [0] * len(localscore)
     prange = range(round(-2*pd),-round(pd/2))
@@ -54,19 +58,26 @@ def detect_phase2(period, onsetenv):
             backlink[i] = timerange[xx]
             starting = 0
     maxm = max(cumscore)
-    bestendposs = find(cumscore, lambda x: x > 0.5*maxm);
+    bestendposs = find(cumscore, lambda x: x > 0.5*maxm)
     bestendx = max(bestendposs)
     b = [bestendx]
     while backlink[b[-1]] > 0:
         b = b + [backlink[b[-1]]]
     b.reverse()
-    return [x / oesv for x in b]
+    boe = localscore[b]
+    bwinlen = 5
+    sboe = np.convolve(np.hanning(bwinlen), boe)
+    sboe = sboe[int(np.floor(bwinlen/2)) + 1: len(boe)]
+    thsboe = 0.5*math.sqrt(np.mean(sboe**2))
+    b = b[np.min(np.argwhere(sboe>thsboe)): np.max(np.argwhere(sboe>thsboe))]
+    return [x / oesr for x in b]
 
 
 if __name__ == "__main__":
+    # open_001.wav test
     onsetenv = scipy.io.loadmat(r'C:\Users\William Heimsoth\Documents\Fall 2016\ENEE408A\onsetenv.mat')['onsetenv']
     onsetenv = onsetenv.reshape(onsetenv.size)
-    print(onsetenv.shape)
-    period = 0.5
+    period = 0.60081625
     beats = detect_phase2(period, onsetenv)
+    print(len(beats))
     print(beats)

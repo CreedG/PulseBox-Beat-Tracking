@@ -271,6 +271,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         ticks = ax.get_xticks()/(44100/display_div)
         ax.set_xticklabels(ticks)
         plt.show()
+    print(known_pd)
     return a
 
 def run_algorithm(wavfile, evaluation):
