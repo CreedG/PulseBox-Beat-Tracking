@@ -146,11 +146,79 @@ class KalmanFilter:
 
 #Initializes my ring class with the known period currently
 def init_phase_globals(period):
-    global r, prev_len
+    global r, prev_len, backlink, cumscore, prange, txwt
     prev_len = [0]*7
+    prev_len2 = 0
+    pl = 0
+    cumscore = [0] * 2580
+    backlink = [-1] * 2580
     r = Ring(period)
+    pd = 86
+    alpha = 6
+    prange = range(round(-2*pd ),-round(pd/2 ))
+    txwt = [-alpha*abs((math.log(x/-pd))**2) for x in prange]
+    starting = 1
 
+
+
+
+#    plt.plot(power_band)
+#    templt = [math.exp(-.5 * (x / (pd/32))**2) for x in range(-pd,pd)]
+#    power_band = np.convolve(templt, power_band)
+#    power_band = power_band[round(len(templt)/2):]
+#    plt.plot(power_band)
+#    plt.show()
 #Returns the next beat by interfacing with the ring class
+def detect_phase2_shit(period, power_onset_vecs):
+    global cumscore
+    onsetenv = [sum(x) for x in zip(*[power_onset_vecs[i].tolist() for i in range(0,7)])]
+    tmp = len(pl)
+    onsetenv = onsetenv[pl:]
+    onsetenv = onsetenv/std(onsetenv)
+    #pl = tmp
+    pd = period * 86
+
+    templt = [math.exp(-.5 * (x / (pd/32))**2) for x in range(-pd,pd)]
+    onsetenv = np.convolve(templt, onsetenv)
+    onsetenv = power_band[round(len(onsetenv)/2):]
+
+    prange = range(round(-2*pd ),-round(pd/2 ))
+    txwt = [-alpha*abs((math.log(x/-pd))**2) for x in prange]
+
+    for i in range(max(-prange[0],pl),tmp):
+        timerange = [i + x for x in prange]
+        scorecands = [sum(x) for x in zip(txwt,cumscore[i + prange[0]: i])]
+        vv = max(scorecands)
+        xx = scorecands.index(vv)
+        cumscore[i] = vv + onsetenv[i] + .7
+        backlink[i] = timerange[xx]
+    maxscore = max(cumscore)
+    i = tmp
+    while True:
+        i -= 1
+
+def detect_phase2(period, power_onset_vecs):
+    global prev_len2, backlink, cumscore
+    pd = 86
+    print(pd)
+    alpha = 6
+    prange = range(round(-2*pd ),-round(pd/2 ))
+    txwt = [-alpha*abs((math.log(x/-pd))**2) for x in prange]
+    power_band = [sum(x) for x in zip(*[power_onset_vecs[i].tolist() for i in range(0,7)])]
+    for i in range(-1 * min(prange) + 1,len(power_band)):
+        timerange = [i + x for x in prange]
+        scorecands = [sum(x) for x in zip(txwt,cumscore[i + prange[0]: i])]
+        vv = max(scorecands)
+        xx = scorecands.index(vv)
+        cumscore[i] = vv + power_band[i]
+        backlink[i] = timerange[xx]
+
+    beats = [cumscore.index(max(cumscore))]
+    while backlink[beats[0]] > 0:
+        beats = [backlink[beats[0]]] + beats
+    return beats
+
+
 def detect_phase(period, times, strengths, time):
     global r, prev_len
 

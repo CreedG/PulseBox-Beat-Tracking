@@ -9,6 +9,7 @@ import scipy.signal
 import time
 import math
 from utils import correlate_onsets, find_consensus, detect_phase, KalmanFilter, init_phase_globals
+from utils2 import detect_phase2
 import threading
 import os
 
@@ -75,7 +76,7 @@ def processing_thread():
 # PART 2: Phase detection by applying the guessed period to the beats
 # Analyze peaks_time and strength to see if they match the guessed period
     t0 = time.time() #benchmark
-    beat_guesses.append(detect_phase(known_pd, peaks_time, peaks_strength, cur_time))
+    #beat_guesses.append(detect_phase(known_pd, power_onset_vecs))
     t1 = time.time() #benchmark
     detect_phase_time += t1-t0
 
@@ -217,6 +218,7 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         plt.show()
 
 
+    lst = ['green', 'purple', 'blue', 'red', 'black', '#aaaaaa', 'cyan']
     if False:
         debug("Showing graph of onset peak times. These are the peaks of onset vectors from low frequency at bottom to high."
                 "The red bar underneath is the real beat.")
@@ -246,18 +248,30 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
             plt.plot([xpos,xpos],[40000,50000], 'k-', lw=1.5, color='black')
 
     if False:
+        plt.figure(11)
+        plt.plot([sum(x) for x in zip(*[power_onset_vecs[i].tolist() for i in range(0,7)])])
+        plt.show()
+        exit(0)
+    if True:
+        onsetenv = [sum(x) for x in zip(*[power_onset_vecs[i].tolist() for i in range(0,7)])]
+        a = detect_phase2(known_pd, onsetenv)
+        print(a)
         plt.figure(2)
         for b in known_beats:
             xpos = 44100/display_div*b
             plt.plot([xpos,xpos],[0,39000], 'k-', lw=1.5, color='r')
+        for b in a:
+            xpos = (44100 * b )/(display_div)
+            plt.plot([xpos,xpos],[-20000,0], 'k-', lw=1.5, color='green')
         for b in found_beats:
             xpos = 44100/display_div*b
-            plt.plot([xpos,xpos],[-36000,0], 'k-', lw=1.5, color='#aaaaaa')
+            plt.plot([xpos,xpos],[-40000,-20000], 'k-', lw=1.5, color='#aaaaaa')
         ax = plt.gca()
         ax.xaxis.set_ticks([n*44100/display_div for n in range (0,31)])
         ticks = ax.get_xticks()/(44100/display_div)
         ax.set_xticklabels(ticks)
         plt.show()
+    return a
 
 def run_algorithm(wavfile, evaluation):
     global known_pd
@@ -273,7 +287,7 @@ def run_algorithm(wavfile, evaluation):
     found_beats, found_pd = beat_detect_simulate_realtime(wav)
 
     debug("Guessed period (at the end of the song) is" + str(found_pd))
-    plot_beats_and_peaks(wav, found_beats, known_beats)
+    found_beats = plot_beats_and_peaks(wav, found_beats, known_beats)
     if not evaluation:
 
         if (abs(found_pd - known_pd) < CORRECTNESS_THRESHOLD or abs(found_pd*2 - known_pd) < CORRECTNESS_THRESHOLD or
