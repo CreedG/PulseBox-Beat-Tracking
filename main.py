@@ -75,7 +75,9 @@ def processing_thread():
 # PART 2: Phase detection by applying the guessed period to the beats
 # Analyze peaks_time and strength to see if they match the guessed period
     t0 = time.time() #benchmark
-    beat_guesses.append(detect_phase(known_pd, peaks_time, peaks_strength, cur_time))
+    beet = detect_phase(known_pd, peaks_time, peaks_strength, cur_time)
+    if len(beat_guesses) == 0 or beat_guesses[-1] != beet:
+        beat_guesses.append(beet)
     t1 = time.time() #benchmark
     detect_phase_time += t1-t0
 
