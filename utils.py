@@ -1,24 +1,19 @@
 import struct
 import wave, sys
 import numpy as np
-
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from time import sleep
-
 import scipy.fftpack
 import scipy.signal
-
 import time
 from ring import Ring
 
 import math
 
-
 time_step = 512.0/44100
 
 debugNum = 0
-
 
 def find_consensus(data, confidence, max_group_size):
     time_step
@@ -145,10 +140,10 @@ class KalmanFilter:
         return self.xhat
 
 #Initializes my ring class with the known period currently
-def init_phase_globals(period):
+def init_phase_globals(period, known_beats):
     global r, prev_len
     prev_len = [0]*7
-    r = Ring(period)
+    r = Ring(period, known_beats)
 
 #Returns the next beat by interfacing with the ring class
 def detect_phase(period, times, strengths, time):
@@ -158,7 +153,8 @@ def detect_phase(period, times, strengths, time):
 
     for b in range(0,len(times)):
         for i in range(prev_len[b], len(times[b])):
-            r.insert(times[b][i], strengths[b][i])
+            r.insert(times[b][i], strengths[b][i], b)
         prev_len[b] = len(times[b])
 
-    return r.generate_next_beat(time)
+    r.generate_next_beat(time)
+    return r.get_beats()

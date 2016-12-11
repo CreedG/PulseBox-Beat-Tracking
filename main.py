@@ -41,7 +41,7 @@ def initialize_values():
 
 #Currently not threaded, just called every 300ms to update beat time guesses
 def processing_thread():
-    global prev_range_pow, peaks_strength, peaks_time, peaks_cutoff, power_onset_vecs, song_over, cur_time, known_pd, k, detect_phase_time
+    global prev_range_pow, peaks_strength, peaks_time, peaks_cutoff, power_onset_vecs, song_over, cur_time, known_pd, k, detect_phase_time, beat_guesses
 
     # PART 1: Period detection by autocorrelating correlating the onset vectors
 
@@ -76,8 +76,7 @@ def processing_thread():
 # Analyze peaks_time and strength to see if they match the guessed period
     t0 = time.time() #benchmark
     beet = detect_phase(known_pd, peaks_time, peaks_strength, cur_time)
-    if len(beat_guesses) == 0 or beat_guesses[-1] != beet:
-        beat_guesses.append(beet)
+    beat_guesses += beet
     t1 = time.time() #benchmark
     detect_phase_time += t1-t0
 
@@ -245,22 +244,20 @@ def plot_beats_and_peaks(wav, found_beats, known_beats):
         for b in peaks_time[6]:
             xpos = 44100/display_div*b
             plt.plot([xpos,xpos],[20000,30000], 'k-', lw=1.5, color='green')
-        for b in found_beats:
-            xpos = 44100/display_div*b
-            plt.plot([xpos,xpos],[40000,50000], 'k-', lw=1.5, color='black')
 
-    if False:
-        plt.figure(2)
+    plt.plot(power_onset_vecs[0])
+    if True:
+        #plt.figure(2)
         for b in known_beats:
-            xpos = 44100/display_div*b
-            plt.plot([xpos,xpos],[0,39000], 'k-', lw=1.5, color='r')
+            xpos = 86*b
+            plt.plot([xpos,xpos],[0000,2000], 'k-', lw=1.5, color='#aaaaaa')
         for b in found_beats:
             xpos = 44100/display_div*b
-            plt.plot([xpos,xpos],[-36000,0], 'k-', lw=1.5, color='#aaaaaa')
+            #plt.plot([xpos,xpos],[-36000,30000], 'k-', lw=1.5, color='#aaaaaa')
         ax = plt.gca()
-        ax.xaxis.set_ticks([n*44100/display_div for n in range (0,31)])
-        ticks = ax.get_xticks()/(44100/display_div)
-        ax.set_xticklabels(ticks)
+        #ax.xaxis.set_ticks([n*44100/display_div for n in range (0,31)])
+        #ticks = ax.get_xticks()/(44100/display_div)
+        #ax.set_xticklabels(ticks)
         plt.show()
 
 def run_algorithm(wavfile, evaluation):
@@ -271,7 +268,7 @@ def run_algorithm(wavfile, evaluation):
 
     #Grab the known beat times from the text file with the same name
     known_beats, known_pd = grab_known_beats(wavfile)
-    init_phase_globals(known_pd)
+    init_phase_globals(known_pd, known_beats)
 
     #Get the algorithm's beat times
     found_beats, found_pd = beat_detect_simulate_realtime(wav)

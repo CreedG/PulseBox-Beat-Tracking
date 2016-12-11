@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy
 class Ring:
-    def __init__(self, period, ticks = 1000, window_size = 13, downshift = .8):
+    def __init__(self, period, actual_beats, window_size = 13, downshift = .98, ticks = 1000):
+        self.beats = []
         self.downshift = downshift
         self.data = [0] * ticks
         self.l = ticks
@@ -11,6 +12,7 @@ class Ring:
         assert(window_size % 2 == 1)
         self.window_size = window_size
         self.hanning = numpy.hanning(window_size)
+        self.actual = actual_beats
         self.phase = 0
 
     def __repr__(self):
@@ -18,6 +20,8 @@ class Ring:
     def plot(self):
         tix = numpy.arange(self.beat - self.period/2, self.beat + self.period/2, self.period / self.l )[0:1000]
         plt.plot([self.beat, self.beat],[0,1.5 * max(self.data)], 'r')
+        for b in self.actual:
+            plt.plot([b, b],[0,1.5 * max(self.data)], 'black')
         plt.plot(tix, self.data)
         plt.xlim([tix[0], tix[-1]])
         plt.ylim([0, 1.5 * max(self.data)])
@@ -49,17 +53,18 @@ class Ring:
     def iter(self, period, time):
         self.period = period
         self.shift_phase(period)
+        #self.plot()
         tmp = self.to_put
         self.to_put = []
-        for t, s in tmp:
-            self.insert(t, s)
+        for t, s, b in tmp:
+            self.insert(t, s, b)
         if len(self.to_put) > 0:
             self.generate_next_beat(time)
             self.iter(period, time)
 
-    def insert(self, time, strength):
+    def insert(self, time, strength, band):
         if time > self.beat + self.period/2:
-           self.to_put.append((time, strength))
+           self.to_put.append((time, strength, band))
            return
         add_to = int((time - self.beat) / self.period * self.l ) + self.l // 2
 #Ignore ticks outside current ticks. Fairly graceless but makes sense for large forward phase shifts
@@ -72,9 +77,14 @@ class Ring:
             j += 1
 
     def generate_next_beat(self, time):
-        self.phase = min([float(i)/self.l * self.period -self.period/2 for i, j in enumerate(self.data) if j == max(self.data)], key=abs)
+        self.phase = float(self.data.index(max(self.data)))/self.l * self.period - self.period / 2
         if time < self.beat + self.period / 2 :
             return self.beat
         self.data = [x * self.downshift for x in self.data]
         self.beat = self.beat + self.phase + self.period
-        return self.beat
+        self.beats.append(self.beat)
+
+    def get_beats(self):
+        to_return = self.beats
+        self.beats = []
+        return to_return
