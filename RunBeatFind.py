@@ -2,7 +2,7 @@ from BeatFind import run_song
 import sys
 import os
 
-path = "all_wavs/"
+path = "../all/"
 def main(argv):
     files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
     wavs = [x[:-4] for x in files if x[-4:] == ".wav"]
