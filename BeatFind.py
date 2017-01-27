@@ -13,7 +13,7 @@ import HelperFuncs as H
 #Each window of data (either captured from the mic or read from the wav file) moves 256 samples at 22050Hz
 time_step = 256.0/22050
 
-PATH = "C:/Users/Creed/Documents/!LightTower/I3CTestWav-master/Algorithm_11_26/all/"
+PATH = "closed/"
 
 #When SIMULATE is set to true, input is from a wav file and output it a list of beat times
 #When SIMULATE is set to false, input is from the microphone and output is a serial write at the beat times to the LED controller
@@ -368,13 +368,28 @@ def main_thread(wav):
 
     return found_beats, period_data
 
+def grab_known(song_name):
+    known_beats = []
+    txtfile_name = PATH + song_name + ".txt"
+    with open(txtfile_name) as f:
+        for line in f:
+            known_beats.append(float(line))
+    known_pds = []
+    for i in range(1, len(known_beats)):
+        known_pds.append(known_beats[i] - known_beats[i-1])
+
+    return known_beats, known_pds
 
 def run_song(song_name):
 
     wav = wave.open(PATH + song_name + ".wav")
     wav.rewind()
 
+    known_beats, known_pds = grab_known(song_name)
     #Run the algorithm
     found_beats, period_data = main_thread(wav)
+    plt.plot(period_data[4])
+    plt.plot(known_pds)
+    #plt.show()
+    return found_beats, known_beats
 
-    print(found_beats)
