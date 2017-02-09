@@ -159,7 +159,7 @@ def verifyStartUpTime(start_up_time, annotations, phase_tolerance):
 def run_test(wav):
     ours, theirs = BeatFind.run_song(wav)
     mainscore, backupscores = beatEvaluator2(ours, theirs)
-    print("'%s' scored %f" % (wav, mainscore))
+    print("%s,%f]" % (wav, mainscore))
     return mainscore
 
 def test_beats():

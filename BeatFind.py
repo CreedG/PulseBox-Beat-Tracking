@@ -12,7 +12,7 @@ import HelperFuncs as H
 
 #Each window of data (either captured from the mic or read from the wav file) moves 256 samples at 22050Hz
 time_step = 256.0/22050
-
+instabilities = []
 PATH = "closed/"
 
 #When SIMULATE is set to true, input is from a wav file and output it a list of beat times
@@ -171,7 +171,7 @@ def window_num_to_time(idx):
 # The amount to snap is dictated by how unstable the tempo was.
 
 def place_beats(onset_vecs, cur_time, cur_window):
-    global prev_beat_guess, tentative_prev_time, prev_thresh, beat_thresh, first_beat_selected, started_placing_beats, beat_max, comb_pows, comb_times, music_playing, found_beats
+    global prev_beat_guess, tentative_prev_time, prev_thresh, beat_thresh, first_beat_selected, started_placing_beats, beat_max, comb_pows, comb_times, music_playing, found_beats, instabilities
 
     # This is the maximum distance to snap to the nearest peak when backtracking. Set it higher if the tempo is unstable
     if (tempo_instability >= P.P_SNAP_THRESH_1):
@@ -182,6 +182,7 @@ def place_beats(onset_vecs, cur_time, cur_window):
         snap_range = 5
     else:
         snap_range = 4
+    instabilities.append(tempo_instability)
 
     if (started_placing_beats):
         # Grab the period from the period estimator
@@ -201,19 +202,19 @@ def place_beats(onset_vecs, cur_time, cur_window):
                 best_index_val = 0
                 best_index = index - snap_range + 1
                 check_max = snap_range
-                if (index >= len(onset_vecs[4]) - snap_range):
+                if (index >= len(onset_vecs[5]) - snap_range):
                     check_max = 1
 
                 for i in range(-snap_range + 1, check_max):
-                    if (onset_vecs[4][index + i] > best_index_val):
-                        best_index_val = onset_vecs[4][index + i]
+                    if (onset_vecs[5][index + i] > best_index_val):
+                        best_index_val = onset_vecs[5][index + i]
                         best_index = index + i
 
                 examine_time = window_num_to_time(best_index) - best_pd
                 if (back_num == 0):
                     snapped_time = window_num_to_time(best_index)
 
-                comb_pow += (onset_vecs[4][best_index])
+                comb_pow += (onset_vecs[5][best_index])
                 back_num += 1
 
             add_pow = comb_pow / time_to_window_num(cur_time)
@@ -279,8 +280,9 @@ def place_beats(onset_vecs, cur_time, cur_window):
 
 def main_thread(wav):
     #Share this data with the period finding code
-    global period_data, tempo_derivative, tempo_instability, tag_use_short_correlation, tag_use_med_correlation
+    global period_data, tempo_derivative, tempo_instability, tag_use_short_correlation, tag_use_med_correlation, instabilities, onset_vecs
 
+    instabilities = []
     #Share this data with the beat finding code
     global prev_beat_guess, tentative_prev_time, prev_thresh, beat_thresh, first_beat_selected, started_placing_beats, beat_max, comb_pows, comb_times, music_playing, found_beats
 
@@ -291,8 +293,8 @@ def main_thread(wav):
 
     #1. Init audio acquisition vars
     cur_sample, cur_window, start_window, cur_time, total_onset_power = 0,0,0,0,0
-    onset_vecs = np.array([[], [], [], [], []], dtype=np.int)
-    prev_onsets = np.zeros(5, dtype=np.int)
+    onset_vecs = np.array([[], [], [], [], [], []], dtype=np.int)
+    prev_onsets = np.zeros(6, dtype=np.int)
     time_vec = []
 
     #2. Init period finding vars
@@ -326,13 +328,14 @@ def main_thread(wav):
         y_psd = np.sqrt(y_psd)
 
         # Sum up the ranges
-        onsets = np.array([0, 0, 0, 0, 0])
+        onsets = np.array([0, 0, 0, 0, 0, 0])
 
         onsets[0] = np.sum(y_psd[0:P.P_FREQ_BAND_1])
         onsets[1] = np.sum(y_psd[P.P_FREQ_BAND_1:P.P_FREQ_BAND_2])
         onsets[2] = np.sum(y_psd[P.P_FREQ_BAND_2:P.P_FREQ_BAND_3])
         onsets[3] = np.sum(y_psd[P.P_FREQ_BAND_3:510])
         onsets[4] = onsets[3] + onsets[2] + onsets[1] + onsets[0]
+        onsets[5] = onsets[3] + onsets[2] + onsets[1] + onsets[0]
 
         # Add up the total power for low and mid frequencies (ignores noise from hf). If this value is sufficiently low, assume there are no instruments (no music) and register no beats
         if (cur_time > 1):
@@ -354,7 +357,7 @@ def main_thread(wav):
         prev_onsets = onsets
 
         # Add the new onset values to the vectors so that we have them stored as power_onset_vecs[range_num][time_idx]
-        new_onset_samples = new_onset_samples.reshape((5, 1))
+        new_onset_samples = new_onset_samples.reshape((6, 1))
         onset_vecs = np.hstack([onset_vecs, new_onset_samples])
 
         # 3. BEAT OFFSET FINDING USING TEMPO
@@ -365,7 +368,6 @@ def main_thread(wav):
         cur_window +=1
         sample_arr = sample_arr[256:]
         sample_arr = np.append(sample_arr,np.fromstring(wav.readframes(512), dtype='int16')[::2])
-
     return found_beats, period_data
 
 def grab_known(song_name):
@@ -384,12 +386,42 @@ def run_song(song_name):
 
     wav = wave.open(PATH + song_name + ".wav")
     wav.rewind()
+    known_beats = []
 
-    known_beats, known_pds = grab_known(song_name)
+    #known_beats, known_pds = grab_known(song_name)
     #Run the algorithm
     found_beats, period_data = main_thread(wav)
-    plt.plot(period_data[4])
-    plt.plot(known_pds)
-    #plt.show()
-    return found_beats, known_beats
+    #plot_results(found_beats, known_beats)
+    found_pds = []
+    for i in range(1, len(found_beats)):
+        found_pds.append(found_beats[i] - found_beats[i-1])
+    plt.plot(period_data[5])
+    #plt.plot(known_pds)
+    plt.show()
+    return found_beats
 
+
+def plot_results(found_beats, known_beats):
+    display_div = 50
+    for b in known_beats:
+        xpos = 44100 / display_div * b
+        plt.plot([xpos, xpos], [-20000, 35000], 'k-', lw=1.5, color='pink')
+    ax = plt.gca()
+    ax.xaxis.set_ticks([n * 44100 / display_div for n in range(0, 31)])
+    ticks = ax.get_xticks() / (44100 / display_div)
+    ax.set_xticklabels(ticks)
+
+    for b in found_beats:
+        xpos = 44100 / display_div * b
+        plt.plot([xpos, xpos], [-25000, 30000], 'k-', lw=1.5, color='cyan')
+    ax = plt.gca()
+    ax.xaxis.set_ticks([n * 44100 / display_div for n in range(0, 31)])
+    ticks = ax.get_xticks() / (44100 / display_div)
+    ax.set_xticklabels(ticks)
+
+    for i in range(5):
+        if i == 4:
+            plt.plot(scipy.signal.resample(onset_vecs[i + 1]*10000 / max(onset_vecs[5]) + 24000 - i * 10000, 44100/50 * 30))
+        else:
+            plt.plot(scipy.signal.resample(onset_vecs[i]*10000 / max(onset_vecs[5]) + 24000 - i * 10000, 44100/50 * 30))
+    plt.show()
