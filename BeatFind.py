@@ -368,6 +368,10 @@ def main_thread(wav):
         cur_window +=1
         sample_arr = sample_arr[256:]
         sample_arr = np.append(sample_arr,np.fromstring(wav.readframes(512), dtype='int16')[::2])
+    srtd = np.sort(onset_vecs[4])[:-300]
+    savg = sum(srtd)/len(srtd)
+    avg = sum(onset_vecs[4]) / len(onset_vecs[4])
+    sys.stdout.write("[" + str(savg/avg) + ",")
     return found_beats, period_data
 
 def grab_known(song_name):
@@ -386,19 +390,18 @@ def run_song(song_name):
 
     wav = wave.open(PATH + song_name + ".wav")
     wav.rewind()
-    known_beats = []
 
-    #known_beats, known_pds = grab_known(song_name)
+    known_beats, known_pds = grab_known(song_name)
     #Run the algorithm
     found_beats, period_data = main_thread(wav)
-    #plot_results(found_beats, known_beats)
+    plot_results(found_beats, known_beats)
     found_pds = []
     for i in range(1, len(found_beats)):
         found_pds.append(found_beats[i] - found_beats[i-1])
     plt.plot(period_data[5])
-    #plt.plot(known_pds)
+    plt.plot(known_pds)
     plt.show()
-    return found_beats
+    return found_beats, known_beats
 
 
 def plot_results(found_beats, known_beats):
