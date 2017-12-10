@@ -150,3 +150,56 @@ def find_consensus(data, confidence, size_within_group):
 
     #Result is a sorted list of bins containing the value and score. sorted[0][0] gives the bin of highest score
     return sorted(bins, key=lambda x: float(x[1]), reverse=True)
+
+def feature1(pts):
+    data = pts[-500:]
+    ret =  np.log(np.max(data)/np.mean(data)) - 2
+    return ret
+def feature2(pts):
+    data = pts[-500:]
+    ret = np.mean(data) / np.mean(np.sort(data)[:-3])
+    return ret
+
+def feature3(data):
+    points = data[-500:]
+    if len(points.shape) == 1:
+        points = points[:,None]
+    median = np.median(points, axis=0)
+    diff = np.sum((points - median)**2, axis=-1)
+    diff = np.sqrt(diff)
+    med_abs_deviation = np.mean(diff)
+
+    modified_z_score = P.Z_MULT * diff / med_abs_deviation
+    for z in modified_z_score:
+        if z > P.MAD_THRESH:
+            return 1
+    return 0
+
+def feature4(pts):
+    data = pts[-500:]
+    diff = (100 - P.OUTLIER_THRESH) / 2.0
+    minval, maxval = np.percentile(data, [diff, 100 - diff])
+    for d in data:
+        if d < minval or d > maxval:
+            return 1
+    return 0
+
+def weighted(onset_vecs, confidence, data, recalc):
+
+    ret = 0
+    for band in range(4):
+        if recalc:
+            modifier = (feature1(onset_vecs[band]) * P.F[0] + feature2(onset_vecs[band]) * P.F[1] + feature3(onset_vecs[band]) * P.F[2] + feature4(onset_vecs[band]) * P.F[3])
+            confidence[band] *= modifier
+        #ret += data[band] * (confidence[band]/ sum(confidence)) * P.ONSET_WEIGHTS[band]
+        ret += data[band] * P.ONSET_WEIGHTS[band]
+    return confidence, ret
+
+def set_params(params):
+    for i in range(4):
+        P.ONSET_WEIGHTS[i] = params[i]
+    P.MAD_THRESH = params[4]
+    P.OUTLIER_THRESH = min(params[5] + 85, 100)
+    for i in range(4):
+        P.F[i] = params[6 + i]
+    P.Z_MULT = params[10]

@@ -10,8 +10,9 @@ def main(argv):
     #challenge_wavs = [x for x in wavs if x[:9] == "challenge"]
     #submitted_wavs = [x for x in wavs if x[:9] == "submitted"]
     #closed_wavs = [x for x in wavs if x[:6] == "closed"]
-    wavs = "competition"
-    print(run_song(wavs))
+    wavs = ["creeds"]
+    for wav in wavs:
+        print(run_song(wav))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

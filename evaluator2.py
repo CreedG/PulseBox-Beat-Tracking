@@ -156,8 +156,8 @@ def verifyStartUpTime(start_up_time, annotations, phase_tolerance):
     return min_ann_time, min_beat_time
 
 
-def run_test(wav):
-    ours, theirs = BeatFind.run_song(wav)
+def run_test(wav, params=None):
+    ours, theirs = BeatFind.run_song(wav, params)
     mainscore, backupscores = beatEvaluator2(ours, theirs)
     print("%s,%f]" % (wav, mainscore))
     return mainscore
@@ -179,7 +179,8 @@ def test_beats():
 if __name__ == "__main__":
     argv = sys.argv[1:]
     if len(argv) != 1:
-        test_beats()
+        #test_beats()
+        run_test('competition')
     else:
         wavfile = argv[0]
         run_test(wavfile)
